@@ -5,7 +5,6 @@ import arc.scene.ui.layout.Cell;
 import arc.scene.ui.layout.Table;
 import arc.struct.ObjectFloatMap;
 import arc.scene.ui.ScrollPane;
-import arc.util.Log;
 import arc.util.Reflect;
 import arc.util.Strings;
 import mindustry.game.Schematic;
@@ -29,43 +28,52 @@ public class SchemePlusDialog extends SchematicsDialog{
 
         ScrollPane pane = (ScrollPane) info.cont.getCells().first().get();
         Table inner = (Table) (((Table) pane.getWidget()).getCells().first().get());
-
-        Log.info("res: items: @, liquids: @, cons: @, prod: @", res.items.size, res.liquids.size, cons, prod);
         
         // ========= BUILD TABLE ========
         Table prodTable = new Table();
         prodTable.table(mainTable -> {
             mainTable.margin(10);
-            mainTable.table(left -> {
-                left.top();
-                left.add("Consumption").color(Pal.remove).padBottom(4).row();
+            
+            // ======== LEFT TABLE =========
+            Table left = new Table();
+            
+            left.top();
+            left.add("Consumption").color(Pal.remove).padBottom(4).row();
+            
+            if (cons != 0){
+                Table row = left.table().left().get();
+                row.image(Icon.powerSmall).color(Pal.remove).padRight(3);
+                row.add("-" + roundToPositive(cons)).color(Pal.remove).left();
+                left.row();
+            }
+            
+            addResourceRows(left, res.items, false);
+            addResourceRows(left, res.liquids, false);
 
-                if (cons != 0){
-                    Table row = left.table().left().get();
-                    row.image(Icon.powerSmall).color(Pal.remove).padRight(3);
-                    row.add("-" + roundToPositive(cons)).color(Pal.remove).left();
-                    left.row();;
-                }
+            if (left.getChildren().size > 1){
+                mainTable.add(left).top().padRight(20);
+            }
 
-                addResourceRows(left, res.items, false);
-                addResourceRows(left, res.liquids, false);
-            }).top().padRight(20); 
 
-            mainTable.table(right -> {
-                right.top();
-                right.add("Production").color(Pal.accent).padBottom(4).row();
+            // ======== RIGHT TABLE ========
+            Table right = new Table();
+            
+            right.top();
+            right.add("Production").color(Pal.accent).padBottom(4).row();
+            
+            if (prod != 0){
+                Table row = right.table().left().get();
+                row.image(Icon.powerSmall).color(Pal.powerLight).padRight(3);
+                row.add("+" + roundToPositive(prod)).color(Pal.powerLight).left();
+                right.row();
+            }
 
-                if (prod != 0){
-                    Table row = right.table().left().get();
-                    row.image(Icon.powerSmall).color(Pal.powerLight).padRight(3);
-                    row.add("+" + roundToPositive(prod)).color(Pal.powerLight).left();
-                    right.row();
-                }
-                
-                addResourceRows(right, res.items, true);
-                addResourceRows(right, res.liquids, true);
-            }).top();
+            addResourceRows(right, res.items, true);
+            addResourceRows(right, res.liquids, true);
 
+            if (right.getChildren().size > 1){
+                mainTable.add(right).top();
+            }
         });
 
         Cell<?> targetCell = null;
