@@ -1,0 +1,187 @@
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
+apply plugin: "java"
+
+version = '1.0'
+
+sourceSets.main.java.srcDirs = ["src"]
+
+repositories{
+    mavenCentral()
+
+    //Downloads the dependencies JAR file from Mindustry releases; does not use any real repository. Surprisingly, this is the most reliable option.
+    ivy{
+        url = 'https://github.com/'
+        patternLayout{artifact '/[organisation]/[module]/releases/download/[revision]/dependencies.jar'}
+        metadataSources{ artifact() }
+    }
+
+    //If the version is set to 'latest', downloads the latest Mindustry *release* as a dependency
+    ivy{
+        url = 'https://github.com/'
+        patternLayout{artifact '/[organisation]/[module]/releases/[revision]/download/dependencies.jar'}
+        metadataSources{ artifact() }
+    }
+
+    //For depending on the absolute newest commit for Mindustry
+    ivy{
+        url = 'https://github.com/'
+        patternLayout{artifact '/[organisation]/[module]/releases/download/master/[revision].jar'}
+        metadataSources{ artifact() }
+    }
+}
+
+java{
+    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_17
+}
+
+ext{
+    // Mindustry version to depend on.
+    // Valid values:
+    // - latest: depend on the latest release of mindustry
+    // - be: depend on the very latest commit of mindustry
+    // - v<number>: depend on a specific commit
+    mindustryVersion = "v158.1"
+    isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
+    sdkRoot = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+}
+
+dependencies{
+    compileOnly mindustryVersion == "be" ? "Anuken:MindustryBuilds:latest" : "Anuken:Mindustry:$mindustryVersion"
+}
+
+tasks.register('jarAndroid'){
+    dependsOn "jar"
+    def projectName = project.name
+
+    doLast{
+        if(!sdkRoot || !new File(sdkRoot).exists()) throw new GradleException("No valid Android SDK found. Ensure that ANDROID_HOME is set to your Android SDK directory.")
+
+        def platformRoot = new File("$sdkRoot/platforms/").listFiles().sort().reverse().find{ f -> new File(f, "android.jar").exists() }
+
+        if(!platformRoot) throw new GradleException("No android.jar found. Ensure that you have an Android platform installed.")
+
+        //collect dependencies needed for desugaring
+        def dependencies = (configurations.compileClasspath.asList() + configurations.runtimeClasspath.asList() + [new File(platformRoot, "android.jar")]).collect{ "--classpath $it.path" }.join(" ")
+
+        def d8 = isWindows ? "d8.bat" : "d8"
+
+        //dex and desugar files - this requires d8 in your PATH
+        "$d8 $dependencies --min-api 14 --output ${projectName}Android.jar ${projectName}Desktop.jar"
+                .execute(null, new File("build/libs")).waitForProcessOutput(System.out, System.err)
+    }
+}
+
+jar{
+    archiveFileName = "${project.name}Desktop.jar"
+
+    from{
+        configurations.runtimeClasspath.collect{ it.isDirectory() ? it : zipTree(it) }
+    }
+
+    from(projectDir){
+        include "mod.hjson"
+    }
+
+    from("assets/"){
+        include "**"
+    }
+}
+
+tasks.register('deploy', Jar){
+    def projectName = project.name
+    dependsOn jarAndroid
+    dependsOn jar
+    archiveFileName = "${projectName}.jar"
+
+    from{ [zipTree("build/libs/${projectName}Desktop.jar"), zipTree("build/libs/${projectName}Android.jar")] }
+
+    doLast{
+        delete{
+            delete "build/libs/${projectName}Android.jar"
+        }
+    }
+}
+
+static def getdatadir() { //Returns Mindustry data directory path
+    def ret = System.getenv("MINDUSTRY_DATA_DIR")
+    if (ret == null) {
+        def os = System.getProperty("os.name")
+        if (os == null) os = ""
+        if (os.contains("Windows")) {
+            return System.getenv("AppData") + "\\Mindustry\\"
+        } else if (os.contains("Linux") || os.contains("BSD")) {
+            if (System.getenv("XDG_DATA_HOME") != null) {
+                String dir = System.getenv("XDG_DATA_HOME")
+                if (!dir.endsWith("/")) dir += "/"
+                return dir + "Mindustry/"
+            }
+            return System.getProperty("user.home") + "/.local/share/Mindustry/"
+        } else if (os.contains("Mac")) {
+            return System.getProperty("user.home") + "/Library/Application Support/Mindustry/"
+        }
+    }
+    return ret
+}
+
+tasks.register('mjar'){
+    dependsOn "jar"
+    def projectName = project.name
+
+    def acopy = { String intoPath ->
+        delete {
+            delete "${intoPath}/${projectName}Desktop.jar"
+        }
+        copy {
+            from "$buildDir/libs/${projectName}Desktop.jar"
+            into intoPath
+        }
+        println "Moved to ${intoPath}"
+    }
+
+    doLast {
+        def modsDirectories = []
+        def file = new File(rootDir, "modsDirectories.txt")
+        if (file.exists()) {
+            file.eachLine { line -> modsDirectories.add(line) }
+        } else {
+            modsDirectories.add("classic")
+        }
+        for (String directory : modsDirectories) {
+            if (directory.startsWith("#") || directory.startsWith("//")) {
+                println "Directory \"$directory\" was skipped."
+                continue
+            }
+            if (directory.equals("classic")) {
+                directory = getdatadir() + "mods"
+            }
+            acopy(directory)
+        }
+        def time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"))
+        println "Build ended at: ${time}"
+    }
+}
+
+tasks.register('mrun'){
+    dependsOn mjar
+    doLast {
+        def gamePath = "${temporaryDir.absolutePath}\\Mindustry${mindustryVersion}.jar"
+        def gameUrl = mindustryVersion.startsWith("v") ?
+                "https://github.com/Anuken/Mindustry/releases/download/${mindustryVersion}/Mindustry.jar" :
+                "https://github.com/Anuken/MindustryBuilds/releases/download/${mindustryVersion}/Mindustry-BE-Desktop.jar"
+
+        if (!new File(gamePath).exists()) {
+            println "Downloading Mindustry build..."
+            new URL(gameUrl).withInputStream { i -> new File(gamePath).withOutputStream { it << i } }
+        }
+
+        println gamePath
+
+        exec {
+            executable "java"
+            args = ["-jar", gamePath]
+        }
+    }
+}
