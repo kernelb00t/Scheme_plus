@@ -1,6 +1,6 @@
 # Scheme Plus
  
-A lightweight [Mindustry](https://mindustrygame.github.io/) v8 mod that extends the built-in schematic info dialog with **resource consumption and production data**.
+A lightweight Mindustry v8 mod that extends the built-in schematic info dialog with resource consumption and production data.
  
 ## What it does
  
@@ -8,6 +8,6 @@ When you open a schematic's info panel in-game, Mindustry only shows you the pow
  
 The dialog shows two columns:
  
-- **Consumption** — power draw and negative item/liquid flow rates (red)
-- **Production** — power output and positive item/liquid flow rates (accent color)
+- Consumption — power draw and negative item/liquid flow rates (red)
+- Production — power output and positive item/liquid flow rates (accent color)
 Rates are computed per-second across every crafter block in the schematic, aggregated by resource type.
