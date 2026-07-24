@@ -24,6 +24,7 @@ public class SchemePlusDialog extends SchematicsDialog {
 
         SchemProduction.Result res = SchemProduction.compute(schem);
         float cons = schem.powerConsumption() * 60, prod = schem.powerProduction() * 60;
+
         if (res.items.size == 0 && res.liquids.size == 0 && res.probItems.size == 0 
                 && res.genericPumpSpeed == 0 && res.drillOptions.isEmpty()
                 && res.generatorFuels.isEmpty() && res.optionalBoosts.isEmpty()
@@ -187,12 +188,22 @@ public class SchemePlusDialog extends SchematicsDialog {
                 groupTable.image(group.block.uiIcon).size(Vars.iconSmall).padRight(4);
                 groupTable.add(group.block.localizedName + (group.count > 1 ? " (x" + group.count + ")" : "") + ":").color(Pal.accent).padRight(6);
 
+                group.itemRates.each(e -> {
+                    float totalRate = e.value * group.count;
+                    groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
+                    groupTable.add("-" + roundToPositive(totalRate) + "/s").color(Pal.remove).padRight(6);
+                });
+
                 group.liquidRates.each(e -> {
                     float totalRate = e.value * group.count;
                     float mult = group.liquidMultipliers.get(e.key, 1f);
                     groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
-                    groupTable.add("-" + roundToPositive(totalRate) + "/s").color(Pal.remove);
-                    groupTable.add("[lightgray](x" + roundToPositive(mult * mult) + ")[]").padLeft(2).padRight(6);
+                    if (mult > 1f) {
+                        groupTable.add("-" + roundToPositive(totalRate) + "/s").color(Pal.remove);
+                        groupTable.add("[lightgray](x" + roundToPositive(mult * mult) + ")[]").padLeft(2).padRight(6);
+                    } else {
+                        groupTable.add("-" + roundToPositive(totalRate) + "/s").color(Pal.remove).padRight(6);
+                    }
                 });
 
                 boostSection.row();

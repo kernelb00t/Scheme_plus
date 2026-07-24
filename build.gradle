@@ -52,8 +52,9 @@ dependencies{
     compileOnly mindustryVersion == "be" ? "Anuken:MindustryBuilds:latest" : "Anuken:Mindustry:$mindustryVersion"
 }
 
+
+
 tasks.register('jarAndroid'){
-    dependsOn "jar"
     def projectName = project.name
 
     doLast{
