@@ -179,9 +179,6 @@ tasks.register('mrun'){
 
         println gamePath
 
-        exec {
-            executable "java"
-            args = ["-jar", gamePath]
-        }
+        "java -jar \"$gamePath\"".execute().waitForProcessOutput(System.out, System.err)
     }
 }
