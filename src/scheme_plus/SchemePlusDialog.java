@@ -4,6 +4,7 @@ import arc.scene.Element;
 import arc.scene.ui.layout.Cell;
 import arc.scene.ui.layout.Table;
 import arc.struct.ObjectFloatMap;
+import arc.struct.Seq;
 import arc.scene.ui.ScrollPane;
 import arc.util.Reflect;
 import arc.util.Strings;
@@ -34,13 +35,39 @@ public class SchemePlusDialog extends SchematicsDialog {
         Table inner = (Table) (((Table) pane.getWidget()).getCells().first().get());
 
         // ========= BUILD PRODUCTION & CONSUMPTION TABLE ========
+        Table prodTable = buildProdTable(res, cons, prod);
+
+        // ========= INSERT TABLE INTO DIALOG =========
+        insertProdTable(inner, prodTable, schem);
+
+        // ======== DRILL MINING OPTIONS SECTION ========
+        if (!res.drillOptions.isEmpty()) {
+            inner.row();
+            inner.add(buildDrillSection(res.drillOptions)).center().growX();
+        }
+
+        // ======== GENERATOR FUEL OPTIONS SECTION ========
+        if (!res.generatorFuels.isEmpty()) {
+            inner.row();
+            inner.add(buildFuelSection(res.generatorFuels)).center().growX();
+        }
+
+        // ======== OPTIONAL BOOSTS / MODIFIERS SECTION ========
+        if (!res.optionalBoosts.isEmpty()) {
+            inner.row();
+            inner.add(buildBoostSection(res.optionalBoosts)).center().growX();
+        }
+
+        inner.invalidateHierarchy();
+    }
+
+    private Table buildProdTable(SchemProduction.Result res, float cons, float prod) {
         Table prodTable = new Table();
         prodTable.table(mainTable -> {
             mainTable.margin(10);
 
             // ======== LEFT TABLE (Consumption) =========
             Table left = new Table();
-
             left.top();
             left.add("Consumption").color(Pal.remove).padBottom(4).row();
 
@@ -60,7 +87,6 @@ public class SchemePlusDialog extends SchematicsDialog {
 
             // ======== RIGHT TABLE (Production) ========
             Table right = new Table();
-
             right.top();
             right.add("Production").color(Pal.accent).padBottom(4).row();
 
@@ -74,7 +100,7 @@ public class SchemePlusDialog extends SchematicsDialog {
             addResourceRows(right, res.items, true);
             addResourceRows(right, res.liquids, true);
 
-            // Probabilistic outputs with floored percentages (never exceeds 100% total)
+            // Probabilistic outputs with floored percentages
             res.probItems.each(e -> {
                 if (e.value <= 0) return;
                 float rawChance = res.probItemChances.get(e.key, 0f);
@@ -97,18 +123,19 @@ public class SchemePlusDialog extends SchematicsDialog {
                 mainTable.add(right).top();
             }
         });
+        return prodTable;
+    }
 
-        // Insert prodTable into info dialog
+    private void insertProdTable(Table inner, Table prodTable, Schematic schem) {
         Cell<?> targetCell = null;
         for (int i = 0; i < inner.getCells().size; i++) {
             Cell<?> cell = inner.getCells().get(i);
             Element el = cell.get();
 
-            if (el instanceof Table) {
-                Table t = (Table) el;
+            if (el instanceof Table t) {
                 for (Element child : t.getChildren()) {
-                    if (child instanceof arc.scene.ui.Image) {
-                        if (((arc.scene.ui.Image) child).getDrawable() == Icon.powerSmall) {
+                    if (child instanceof arc.scene.ui.Image img) {
+                        if (img.getDrawable() == Icon.powerSmall) {
                             targetCell = cell;
                             break;
                         }
@@ -130,90 +157,79 @@ public class SchemePlusDialog extends SchematicsDialog {
                 inner.add(prodTable).center().growX();
             }
         }
+    }
 
-        // ======== DRILL MINING OPTIONS SECTION ========
-        if (!res.drillOptions.isEmpty()) {
-            Table drillSection = new Table();
-            drillSection.margin(6);
-            drillSection.add("Drill Rates:").color(Pal.lightishGray).padBottom(4).row();
+    private Table buildDrillSection(Seq<SchemProduction.DrillOptionGroup> drillOptions) {
+        Table drillSection = new Table();
+        drillSection.margin(6);
+        drillSection.add("Drill Rates:").color(Pal.lightishGray).padBottom(4).row();
 
-            for (SchemProduction.DrillOptionGroup group : res.drillOptions) {
-                Table groupTable = drillSection.table().left().padBottom(4).get();
-                groupTable.image(group.drill.uiIcon).size(Vars.iconSmall).padRight(4);
-                groupTable.add(group.drill.localizedName + (group.count > 1 ? " (x" + group.count + ")" : "") + ":").color(Pal.accent).padRight(6);
+        for (SchemProduction.DrillOptionGroup group : drillOptions) {
+            Table groupTable = drillSection.table().left().padBottom(4).get();
+            groupTable.image(group.drill.uiIcon).size(Vars.iconSmall).padRight(4);
+            groupTable.add(group.drill.localizedName + (group.count > 1 ? " (x" + group.count + ")" : "") + ":").color(Pal.accent).padRight(6);
 
-                group.itemRates.each(e -> {
-                    float totalRate = e.value * group.count;
-                    groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
-                    groupTable.add("+" + roundToPositive(totalRate) + "/s").color(Pal.accent).padRight(6);
-                });
-                drillSection.row();
-            }
-
-            inner.row();
-            inner.add(drillSection).center().growX();
+            group.itemRates.each(e -> {
+                float totalRate = e.value * group.count;
+                groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
+                groupTable.add("+" + roundToPositive(totalRate) + "/s").color(Pal.accent).padRight(6);
+            });
+            drillSection.row();
         }
+        return drillSection;
+    }
 
-        // ======== GENERATOR FUEL OPTIONS SECTION ========
-        if (!res.generatorFuels.isEmpty()) {
-            Table fuelSection = new Table();
-            fuelSection.margin(6);
-            fuelSection.add("Fuel Options:").color(Pal.lightishGray).padBottom(4).row();
+    private Table buildFuelSection(Seq<SchemProduction.GeneratorFuelGroup> generatorFuels) {
+        Table fuelSection = new Table();
+        fuelSection.margin(6);
+        fuelSection.add("Fuel Options:").color(Pal.lightishGray).padBottom(4).row();
 
-            for (SchemProduction.GeneratorFuelGroup group : res.generatorFuels) {
-                Table groupTable = fuelSection.table().left().padBottom(4).get();
-                groupTable.image(group.generator.uiIcon).size(Vars.iconSmall).padRight(4);
-                groupTable.add(group.generator.localizedName + (group.count > 1 ? " (x" + group.count + ")" : "") + ":").color(Pal.accent).padRight(6);
+        for (SchemProduction.GeneratorFuelGroup group : generatorFuels) {
+            Table groupTable = fuelSection.table().left().padBottom(4).get();
+            groupTable.image(group.generator.uiIcon).size(Vars.iconSmall).padRight(4);
+            groupTable.add(group.generator.localizedName + (group.count > 1 ? " (x" + group.count + ")" : "") + ":").color(Pal.accent).padRight(6);
 
-                group.itemRates.each(e -> {
-                    float totalRate = e.value * group.count;
-                    groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
+            group.itemRates.each(e -> {
+                float totalRate = e.value * group.count;
+                groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
+                groupTable.add("-" + roundToPositive(totalRate) + "/s").color(Pal.remove).padRight(6);
+            });
+            fuelSection.row();
+        }
+        return fuelSection;
+    }
+
+    private Table buildBoostSection(Seq<SchemProduction.OptionalBoostGroup> optionalBoosts) {
+        Table boostSection = new Table();
+        boostSection.margin(6);
+        boostSection.add("Modifiers / Boosts:").color(Pal.lightishGray).padBottom(4).row();
+
+        for (SchemProduction.OptionalBoostGroup group : optionalBoosts) {
+            Table groupTable = boostSection.table().left().padBottom(4).get();
+            groupTable.image(group.block.uiIcon).size(Vars.iconSmall).padRight(4);
+            groupTable.add(group.block.localizedName + (group.count > 1 ? " (x" + group.count + ")" : "") + ":").color(Pal.accent).padRight(6);
+
+            group.itemRates.each(e -> {
+                float totalRate = e.value * group.count;
+                groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
+                groupTable.add("-" + roundToPositive(totalRate) + "/s").color(Pal.remove).padRight(6);
+            });
+
+            group.liquidRates.each(e -> {
+                float totalRate = e.value * group.count;
+                float mult = group.liquidMultipliers.get(e.key, 1f);
+                groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
+                if (mult > 1f) {
+                    groupTable.add("-" + roundToPositive(totalRate) + "/s").color(Pal.remove);
+                    groupTable.add("[lightgray](x" + roundToPositive(mult * mult) + ")[]").padLeft(2).padRight(6);
+                } else {
                     groupTable.add("-" + roundToPositive(totalRate) + "/s").color(Pal.remove).padRight(6);
-                });
-                fuelSection.row();
-            }
+                }
+            });
 
-            inner.row();
-            inner.add(fuelSection).center().growX();
+            boostSection.row();
         }
-
-        // ======== OPTIONAL BOOSTS / MODIFIERS SECTION ========
-        if (!res.optionalBoosts.isEmpty()) {
-            Table boostSection = new Table();
-            boostSection.margin(6);
-            boostSection.add("Modifiers / Boosts:").color(Pal.lightishGray).padBottom(4).row();
-
-            for (SchemProduction.OptionalBoostGroup group : res.optionalBoosts) {
-                Table groupTable = boostSection.table().left().padBottom(4).get();
-                groupTable.image(group.block.uiIcon).size(Vars.iconSmall).padRight(4);
-                groupTable.add(group.block.localizedName + (group.count > 1 ? " (x" + group.count + ")" : "") + ":").color(Pal.accent).padRight(6);
-
-                group.itemRates.each(e -> {
-                    float totalRate = e.value * group.count;
-                    groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
-                    groupTable.add("-" + roundToPositive(totalRate) + "/s").color(Pal.remove).padRight(6);
-                });
-
-                group.liquidRates.each(e -> {
-                    float totalRate = e.value * group.count;
-                    float mult = group.liquidMultipliers.get(e.key, 1f);
-                    groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
-                    if (mult > 1f) {
-                        groupTable.add("-" + roundToPositive(totalRate) + "/s").color(Pal.remove);
-                        groupTable.add("[lightgray](x" + roundToPositive(mult * mult) + ")[]").padLeft(2).padRight(6);
-                    } else {
-                        groupTable.add("-" + roundToPositive(totalRate) + "/s").color(Pal.remove).padRight(6);
-                    }
-                });
-
-                boostSection.row();
-            }
-
-            inner.row();
-            inner.add(boostSection).center().growX();
-        }
-
-        inner.invalidateHierarchy();
+        return boostSection;
     }
 
     private <T extends UnlockableContent> void addResourceRows(Table t, ObjectFloatMap<T> elements, boolean positive) {
