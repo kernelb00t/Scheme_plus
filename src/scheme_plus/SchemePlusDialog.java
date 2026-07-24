@@ -71,7 +71,7 @@ public class SchemePlusDialog extends SchematicsDialog {
             left.top();
             left.add("Consumption").color(Pal.remove).padBottom(4).row();
 
-            if (cons != 0) {
+            if (Math.abs(cons) >= 0.01f) {
                 Table row = left.table().left().get();
                 row.image(Icon.powerSmall).color(Pal.remove).padRight(3);
                 row.add("-" + roundToPositive(cons)).color(Pal.remove).left();
@@ -90,7 +90,7 @@ public class SchemePlusDialog extends SchematicsDialog {
             right.top();
             right.add("Production").color(Pal.accent).padBottom(4).row();
 
-            if (prod != 0) {
+            if (Math.abs(prod) >= 0.01f) {
                 Table row = right.table().left().get();
                 row.image(Icon.powerSmall).color(Pal.powerLight).padRight(3);
                 row.add("+" + roundToPositive(prod)).color(Pal.powerLight).left();
@@ -102,7 +102,7 @@ public class SchemePlusDialog extends SchematicsDialog {
 
             // Probabilistic outputs with floored percentages
             res.probItems.each(e -> {
-                if (e.value <= 0) return;
+                if (e.value < 0.01f) return;
                 float rawChance = res.probItemChances.get(e.key, 0f);
                 int chance = (int) Math.floor(rawChance);
                 Table row = right.table().left().get();
@@ -112,7 +112,7 @@ public class SchemePlusDialog extends SchematicsDialog {
             });
 
             // Generic Pump speed if liquid config is empty
-            if (res.genericPumpSpeed > 0) {
+            if (res.genericPumpSpeed >= 0.01f) {
                 Table row = right.table().left().get();
                 row.image(Icon.liquidSmall).size(Vars.iconMed).padRight(4);
                 row.add("+" + roundToPositive(res.genericPumpSpeed) + "/s [lightgray](Liquid)[]").color(Pal.accent);
@@ -171,6 +171,7 @@ public class SchemePlusDialog extends SchematicsDialog {
 
             group.itemRates.each(e -> {
                 float totalRate = e.value * group.count;
+                if (totalRate < 0.01f) return;
                 groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
                 groupTable.add("+" + roundToPositive(totalRate) + "/s").color(Pal.accent).padRight(6);
             });
@@ -191,6 +192,7 @@ public class SchemePlusDialog extends SchematicsDialog {
 
             group.itemRates.each(e -> {
                 float totalRate = e.value * group.count;
+                if (totalRate < 0.01f) return;
                 groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
                 groupTable.add("-" + roundToPositive(totalRate) + "/s").color(Pal.remove).padRight(6);
             });
@@ -211,12 +213,14 @@ public class SchemePlusDialog extends SchematicsDialog {
 
             group.itemRates.each(e -> {
                 float totalRate = e.value * group.count;
+                if (totalRate < 0.01f) return;
                 groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
                 groupTable.add("-" + roundToPositive(totalRate) + "/s").color(Pal.remove).padRight(6);
             });
 
             group.liquidRates.each(e -> {
                 float totalRate = e.value * group.count;
+                if (totalRate < 0.01f) return;
                 float mult = group.liquidMultipliers.get(e.key, 1f);
                 groupTable.image(e.key.uiIcon).size(Vars.iconSmall).padRight(2);
                 if (mult > 1f) {
