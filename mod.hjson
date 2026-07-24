@@ -14,7 +14,7 @@ main: "scheme_plus.SchemePlus"
 description: "Scheme Plus adds a compact breakdown of every item and liquid the schematic consumes or produces per second."
 
 #the mod version
-version: v1.0
+version: v2.0
 
 #the minimum game build required to run this mod
 minGameVersion: 158
